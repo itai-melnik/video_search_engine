@@ -3,3 +3,5 @@ scenedetect[opencv]
 opencv-python
 tqdm
 ollama
+rapidfuzz
+Pillow

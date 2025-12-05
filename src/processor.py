@@ -71,11 +71,17 @@ def generate_captions(scenes_dir, json_path):
         logger.info("Captions file found at '%s'. Skipping AI generation.", json_path)
         return
 
+    # Ensure scenes directory exists
+    if not os.path.exists(scenes_dir):
+        logger.error("Scenes directory '%s' does not exist. Run extract_scenes() first.", scenes_dir)
+        raise FileNotFoundError(f"Scenes directory '{scenes_dir}' does not exist. Run extract_scenes() first.")
+
     # Get list of images
     image_files = sorted([f for f in os.listdir(scenes_dir) if f.endswith('.jpg')])
 
     captions = {}
     logger.info("Generating captions for %d scenes using Moondream via Ollama...", len(image_files))
+
 
     # 2. Process with Progress Bar
     for img_file in tqdm(image_files, desc="AI Captioning"):
@@ -99,6 +105,11 @@ def generate_captions(scenes_dir, json_path):
             captions[img_file] = "Error generating caption."
 
     # 3. Save to JSON
+    # Ensure parent directory exists
+    json_dir = os.path.dirname(json_path)
+    if json_dir and not os.path.exists(json_dir):
+        os.makedirs(json_dir)
+    
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(captions, f, indent=4)
     
