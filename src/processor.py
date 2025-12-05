@@ -8,7 +8,7 @@ from scenedetect.detectors import ContentDetector
 
 logger = logging.getLogger(__name__)
 
-def extract_scenes(video_path, output_dir, threshold=27.0):
+def extract_scenes(video_path, output_dir, threshold=20.0):
     """
     Detects scenes in the video and saves frames from each scene as images.
     Uses PySceneDetect's built-in save_images for efficient extraction.
@@ -31,7 +31,7 @@ def extract_scenes(video_path, output_dir, threshold=27.0):
     # 2. Setup PySceneDetect
     video = open_video(video_path)
     scene_manager = SceneManager()
-    scene_manager.add_detector(ContentDetector(threshold=threshold))
+    scene_manager.add_detector(ContentDetector(threshold=threshold, min_scene_len=15))
 
     # 3. Detect Scenes
     scene_manager.detect_scenes(video, show_progress=True)

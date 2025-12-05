@@ -26,7 +26,7 @@ def main():
     # Phase 2: Scene Detection
     # We save scenes to assets/scenes
     scenes_dir = os.path.join("assets", "scenes")
-    extract_scenes(video_path, scenes_dir, threshold=26.0)
+    extract_scenes(video_path, scenes_dir, threshold=20.0)
 
    
 
