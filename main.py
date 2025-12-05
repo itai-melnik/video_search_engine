@@ -1,5 +1,7 @@
 import logging
+import os
 from src.downloader import download_video
+from src.processor import extract_scenes
 
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,11 @@ def main():
     if not video_path:
         logger.error("Critical Error: Could not obtain video. Exiting.")
         return
+
+    # Phase 2: Scene Detection
+    # We save scenes to assets/scenes
+    scenes_dir = os.path.join("assets", "scenes")
+    extract_scenes(video_path, scenes_dir, threshold=26.0)
 
    
 
