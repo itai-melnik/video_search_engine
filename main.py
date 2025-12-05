@@ -1,7 +1,7 @@
 import logging
 import os
 from src.downloader import download_video
-from src.processor import extract_scenes
+from src.processor import extract_scenes, generate_captions
 
 
 logger = logging.getLogger(__name__)
@@ -14,6 +14,13 @@ def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
+
+    # Paths
+    assets_dir = "assets"
+    scenes_dir = os.path.join(assets_dir, "scenes") 
+    video_path = os.path.join(assets_dir, "video.mp4")
+    json_path = os.path.join(assets_dir, "scene_captions.json")
+
     print("--- Video Search Engine ---")
     
     # Phase 1: Ingestion
@@ -24,9 +31,11 @@ def main():
         return
 
     # Phase 2: Scene Detection
-    # We save scenes to assets/scenes
-    scenes_dir = os.path.join("assets", "scenes")
     extract_scenes(video_path, scenes_dir, threshold=20.0)
+
+
+    # Phase 3: AI Captioning (Moondream)
+    generate_captions(scenes_dir, json_path)
 
    
 

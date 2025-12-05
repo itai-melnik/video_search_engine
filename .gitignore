@@ -1,1 +1,4 @@
 assets/
+.env
+.venv/
+__pycache__/
