@@ -2,6 +2,7 @@ import os
 import json
 import math
 import logging
+import re
 from rapidfuzz import process, fuzz
 from PIL import Image
 
@@ -10,6 +11,22 @@ logger = logging.getLogger(__name__)
 def load_captions(json_path):
     with open(json_path, 'r', encoding='utf-8') as f:
         return json.load(f)
+
+def extract_words_from_captions(captions):
+    """
+    Extracts all unique words from captions for auto-complete.
+    Returns a sorted list of unique words (lowercased).
+    """
+    words = set()
+    for caption in captions.values():
+        # Extract words (letters only, ignore punctuation)
+        caption_words = re.findall(r'\b[a-zA-Z]+\b', caption.lower())
+        words.update(caption_words)
+    
+    # Filter out very short words
+    words = {w for w in words if len(w) > 2}
+    
+    return sorted(words)
 
 def search_scenes(query, captions, threshold=60):
     """
