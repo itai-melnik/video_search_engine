@@ -4,12 +4,38 @@ Handles all video processing tasks
 import logging
 import os
 import json
-import ollama
+import torch
+from PIL import Image
 from tqdm import tqdm
+from transformers import AutoModelForCausalLM
 from scenedetect import open_video, SceneManager, save_images
 from scenedetect.detectors import ContentDetector
 
 logger = logging.getLogger(__name__)
+
+# Global model instance (loaded once, reused)
+_moondream_model = None
+
+
+def _get_moondream_model():
+    """
+    Lazily loads and returns the Moondream2 model.
+    Uses MPS on Apple Silicon, CUDA on NVIDIA GPUs, or CPU as fallback.
+    """
+    global _moondream_model
+
+
+    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        _moondream_model = AutoModelForCausalLM.from_pretrained(
+                "vikhyatk/moondream2",
+                revision="2025-06-21",
+                trust_remote_code=True,
+                device_map={"": "mps"}
+            )
+        
+    logger.info("Moondream2 model loaded successfully.")
+    
+    return _moondream_model
 
 def extract_scenes(video_path, output_dir, threshold=20.0):
     """
@@ -54,16 +80,35 @@ def extract_scenes(video_path, output_dir, threshold=20.0):
         show_progress=True,
     )
 
+    # 5. Resize images to max 512px and convert to JPEG to save compute
+    logger.info("Resizing images to max 512px...")
+    max_size = 512
+    for img_file in os.listdir(output_dir):
+        if not img_file.endswith('.jpg'):
+            continue
+        img_path = os.path.join(output_dir, img_file)
+        with Image.open(img_path) as img:
+            # Calculate new size maintaining aspect ratio
+            width, height = img.size
+            if max(width, height) > max_size:
+                if width > height:
+                    new_width = max_size
+                    new_height = int(height * max_size / width)
+                else:
+                    new_height = max_size
+                    new_width = int(width * max_size / height)
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+            # Save as JPEG with quality=75 for smaller file size
+            img.convert("RGB").save(img_path, "JPEG", quality=75)
+
     logger.info("Saved %d scene images to '%s'", len(scene_list), output_dir)
 
 
 
 def generate_captions(scenes_dir, json_path):
     """
-    Iterates over images in scenes_dir, sends them to Moondream via Ollama,
+    Iterates over images in scenes_dir, generates captions using Moondream2,
     and saves a JSON mapping filename -> caption.
-    
-    Note: Ollama must be running with the moondream model pulled.
     """
     
     # 1. Caching Check
@@ -79,25 +124,24 @@ def generate_captions(scenes_dir, json_path):
     # Get list of images
     image_files = sorted([f for f in os.listdir(scenes_dir) if f.endswith('.jpg')])
 
+    # Load Moondream2 model
+    model = _get_moondream_model()
+
     captions = {}
-    logger.info("Generating captions for %d scenes using Moondream via Ollama...", len(image_files))
+    logger.info("Generating captions for %d scenes using Moondream2...", len(image_files))
 
-
+    
     # 2. Process with Progress Bar
     for img_file in tqdm(image_files, desc="AI Captioning"):
         img_full_path = os.path.join(scenes_dir, img_file)
 
         try:
-            # Call Moondream via Ollama
-            response = ollama.chat(model='moondream', messages=[
-                {
-                    'role': 'user',
-                    'content': 'Describe this image briefly. Focus on main characters, setting, and action.',
-                    'images': [img_full_path]
-                }
-            ])
+            # Load image using PIL
+            image = Image.open(img_full_path).convert("RGB")
             
-            description = response['message']['content'].strip()
+            # Generate caption using Moondream2's built-in caption method
+            result = model.caption(image, length="short")
+            description = result["caption"].strip()
             captions[img_file] = description
             
         except Exception as e:

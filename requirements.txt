@@ -2,7 +2,10 @@ yt-dlp
 scenedetect[opencv]
 opencv-python
 tqdm
-ollama
+transformers
+torch
+einops
+accelerate
 rapidfuzz
 Pillow
 prompt_toolkit
