@@ -1,12 +1,17 @@
 import logging
 import os
+from dotenv import load_dotenv
 from src.downloader import download_video
 from src.processor import extract_scenes, generate_captions
-from src.search_engine import load_captions, search_scenes, create_collage, extract_words_from_captions
+from src.search_engine import load_captions, search_scenes, create_collage, extract_words_from_captions, extract_frames_from_timestamps
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
+from src.cloud_search import search_video_for_timestamps
+
+load_dotenv()  
 
 logger = logging.getLogger(__name__)
+
 
 
 def search_loop(captions, scenes_dir, collage_path):
@@ -63,24 +68,69 @@ def main():
     print("--- Video Search Engine ---")
     
     # Phase 1: Ingestion
-    video_path = download_video("super mario movie trailer", "video.mp4")
+    if not os.path.exists(video_path):
+        video_path = download_video("super mario movie trailer", "video.mp4")
     
     if not video_path:
         logger.error("Critical Error: Could not obtain video. Exiting.")
         return
 
-    # Phase 2: Scene Detection
-    extract_scenes(video_path, scenes_dir, threshold=20.0)
+    # Ensure output directory exists
+    if not os.path.exists("output"): 
+        os.makedirs("output")
 
 
-    # Phase 3: AI Captioning (Moondream)
-    generate_captions(scenes_dir, json_path)
+    while True:
+        print("\nChoose Mode:")
+        print("1. 🖼️  Local Visual Search (Moondream + RapidFuzz)")
+        print("2. 🤖 Cloud Video Understanding (Gemini 2.5 Flash)")
+        print("3. Exit")
+
+        choice = input("Select: ").strip()
+
+        if choice == '1':
+            # Run the local pipeline if data is missing
+
+            # Phase 1: Ingestion
+            extract_scenes(video_path, scenes_dir, threshold=20.0)
+
+            # Phase 2: Captioning
+            generate_captions(scenes_dir, json_path)
+
+            captions = load_captions(json_path)
+
+            # Phase 3: Search Loop
+            print("\n✅ System Ready.")
+            search_loop(captions, scenes_dir, collage_path)
+
+        elif choice == '2':
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                api_key = input("Enter your Gemini API Key: ").strip()
+
+            query = input("What do you want to find in the video? ")
+
+            # Phase 1: Get Timestamps from Cloud
+            events = search_video_for_timestamps(api_key, video_path, query)
+
+            if events:
+                # 2. Extract Frames locally
+                gemini_scenes_dir = os.path.join(assets_dir, "gemini_results")
+                images = extract_frames_from_timestamps(video_path, events, gemini_scenes_dir)
 
 
-    # Phase 4: Search Loop
-    print("\n✅ System Ready.")
-    captions = load_captions(json_path)
-    search_loop(captions, scenes_dir, collage_path)
+            # 3. Create Collage
+                if images:
+                    create_collage(images, gemini_scenes_dir, collage_path)
+
+        elif choice == '3':
+            print("Goodbye!")
+            break
+
+
+
+    
+  
 
    
 

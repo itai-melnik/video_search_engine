@@ -3,6 +3,7 @@ import json
 import math
 import logging
 import re
+import cv2 
 from rapidfuzz import process, fuzz
 from PIL import Image
 
@@ -96,6 +97,57 @@ def create_collage(image_filenames, scenes_dir, output_path):
     # Open the image automatically (works on Mac)
     try:
         os.system(f"open {output_path}") 
-    except:
-        pass
+    except Exception as e:
+        logger.error("Error opening collage: %s", e)
+
+
+def extract_frames_from_timestamps(video_path, events, output_dir):
+    """
+    Takes a list of event dicts [{'timestamp': '01:23', ...}],
+    extracts the specific frame from the video, and saves it.
+    Returns list of saved filenames for the collage.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    saved_files = []
+ 
+    # pylint: disable=no-member
+    cap = cv2.VideoCapture(video_path)
+    
+    # Get Frames Per Second (FPS) to calculate frame number
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    
+    logger.info("📸 Extracting frames based on Gemini timestamps...")
+    
+    for i, event in enumerate(events):
+        ts_str = event['timestamp']
+        
+        try:
+            # Convert "MM:SS" -> Seconds -> Frame Number
+            parts = ts_str.split(':')
+            if len(parts) == 2:
+                seconds = int(parts[0]) * 60 + int(parts[1])
+            elif len(parts) == 3: # HH:MM:SS
+                seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            else:
+                seconds = int(parts[0]) # Assume raw seconds if no colon
+
+            frame_num = int(seconds * fps)
+            
+            # Jump to frame
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+            ret, frame = cap.read()
+            
+            if ret:
+                filename = f"gemini_match_{i}.jpg"
+                path = os.path.join(output_dir, filename)
+                cv2.imwrite(path, frame)
+                saved_files.append(filename)
+                
+        except ValueError:
+            print(f"   Skipping invalid timestamp: {ts_str}")
+
+    cap.release()
+    return saved_files
 

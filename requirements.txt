@@ -9,3 +9,5 @@ accelerate
 rapidfuzz
 Pillow
 prompt_toolkit
+google-genai
+python-dotenv
